@@ -11,7 +11,21 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService
-    ) {}
+  ) { }
+
+
+  async getUserById(id: string): Promise<users> {
+    const user = await this.prisma.users.findUnique({
+      where: {
+        id: Number(id)
+      }
+    })
+
+    if (!user) {
+      throw new HttpException('Usuário não encontrado', HttpStatus.NOT_FOUND)
+    }
+    return user
+  }
 
   async verifyUserExists(email: string): Promise<boolean> {
     const user = await this.prisma.users.findUnique({
@@ -43,7 +57,7 @@ export class UsersService {
         },
       });
 
-      if(await this.emailService.sendEmail(email, 'Bem vinda ao sistema', 'Você se cadastrou no site fiap-avanade', {})){
+      if (await this.emailService.sendEmail(email, 'Bem vinda ao sistema', 'Você se cadastrou no site fiap-avanade', {})) {
         console.log('Email enviado com sucesso!')
       }
     }
@@ -72,9 +86,52 @@ export class UsersService {
     });
   }
 
-  async update(id: number, req: UpdateUserDTO): Promise<string> {
-    return `Usuário ${id} atualizado com sucesso!`;
+  async update(id: number, req: UpdateUserDTO): Promise<object> {
+    const user = await this.getUserById(id.toString());
+
+    const { name, email, password } = req;
+    if(email) {
+      const checkEmail = await this.prisma.users.findMany({
+        where: {
+          AND: [{email: email}, {id: {not: Number(id)} }]
+        }
+      })
+
+      if(checkEmail) {
+        throw new HttpException(
+          {
+            status: HttpStatus.FORBIDDEN,
+            message: 'Este email está indisponível!'
+          },
+          HttpStatus.FORBIDDEN
+        )
+      }
+    }
+
+    const updatedUser = await this.prisma.users.update({
+      where: {
+        id: Number(id),
+      },
+      data: {
+        name: name ? name : user.name,
+        email: email ? email : user.email,
+        password: password ? await this.crypto(password) : user.password,
+      },
+    });
+
+    if (!updatedUser) {
+      throw new HttpException(
+        {
+          status: HttpStatus.FORBIDDEN,
+          message: 'Erro ao atualizar usuário!',
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    return { msg: `Usuário ${updatedUser.name} atualizado com sucesso!` };
   }
+
 
   async remove(id: number): Promise<string> {
     return `Usuário ${id} deletado com sucesso!`;
