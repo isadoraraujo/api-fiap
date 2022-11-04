@@ -133,7 +133,23 @@ export class UsersService {
   }
 
 
-  async remove(id: number): Promise<string> {
-    return `Usuário ${id} deletado com sucesso!`;
+  async remove(id: number): Promise<object> {
+    const user = await this.getUserById(id.toString())
+
+    const deletedUser = await this.prisma.users.delete({
+      where: {
+        id: Number(id)
+      }
+    })
+
+    if(!deletedUser) {
+      throw new HttpException({
+        status: HttpStatus.FORBIDDEN,
+        message: 'Erro ao deletar usuário!'
+      },
+      HttpStatus.FORBIDDEN
+      )
+    }
+    return { msg: `Usuário ${id} deletado com sucesso!` };
   }
 }
